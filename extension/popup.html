@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #333;
+    }
+    .status {
+      padding: 12px;
+      margin-bottom: 16px;
+      border-radius: 6px;
+      background: #f5f5f5;
+      text-align: center;
+    }
+    .count {
+      font-size: 32px;
+      font-weight: bold;
+      color: #2563eb;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .count.warning {
+      color: #d97706;
+    }
+    .label {
+      font-size: 13px;
+      color: #666;
+    }
+    .warning-text {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #d97706;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      background: #2563eb;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .result.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .result.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+  <h1>News Digest</h1>
+  <div class="status">
+    <span class="count" id="count">0</span>
+    <span class="label">новостей Perplexity</span>
+    <div class="warning-text" id="warning" style="display: none;"></div>
+  </div>
+  <button id="collect">Собрать новости</button>
+  <div id="result" class="result" style="display: none;"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
