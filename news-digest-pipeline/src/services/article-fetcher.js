@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { chromium } from 'playwright-core';
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
@@ -12,7 +13,11 @@ const CONTENT_SELECTORS = [
 
 const REMOVE_SELECTORS = 'script, style, nav, header, footer, [class*="sideBarWidth"], .sidebar, aside, [role="navigation"], [role="banner"]';
 
-export async function fetchArticleContent(url) {
+/**
+ * Try fetching article content with cheerio (fast, lightweight).
+ * Returns { title, content } or throws on failure.
+ */
+async function fetchWithCheerio(url) {
   const response = await fetch(url, {
     headers: {
       'User-Agent': USER_AGENT,
@@ -28,6 +33,13 @@ export async function fetchArticleContent(url) {
   }
 
   const html = await response.text();
+  return extractFromHtml(html);
+}
+
+/**
+ * Extract title and content from raw HTML using cheerio.
+ */
+function extractFromHtml(html) {
   const $ = cheerio.load(html);
 
   // Remove unwanted elements
@@ -63,9 +75,72 @@ export async function fetchArticleContent(url) {
   // Clean up whitespace
   content = content.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
 
-  if (content.length < 200) {
-    throw new Error(`Content too short (${content.length} chars) for ${url}`);
+  return { title, content };
+}
+
+/**
+ * Fallback: fetch article content using Playwright headless browser.
+ * Used when cheerio fetch gets 403 or content is too short.
+ */
+async function fetchWithPlaywright(url) {
+  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+    || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+  const browser = await chromium.launch({
+    headless: false,  // We use --headless=new via args (bypasses bot detection better than old headless)
+    executablePath,
+    args: ['--headless=new', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+
+  try {
+    const context = await browser.newContext({
+      userAgent: USER_AGENT,
+    });
+    const page = await context.newPage();
+
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+
+    // Wait for dynamic content to render (SPA pages like Perplexity)
+    await page.waitForTimeout(5000);
+
+    const html = await page.content();
+    const result = extractFromHtml(html);
+
+    return result;
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function fetchArticleContent(url) {
+  // Try cheerio first (fast, lightweight)
+  try {
+    const result = await fetchWithCheerio(url);
+    if (result.content && result.content.length >= 200) {
+      return result;
+    }
+    // Content too short — fall through to Playwright
+    console.log(`[article-fetcher] Cheerio got short content (${result.content?.length || 0} chars) for ${url}, trying Playwright...`);
+  } catch (err) {
+    const is403 = err.message.includes('HTTP 403');
+    if (is403) {
+      console.log(`[article-fetcher] Got 403 for ${url}, trying Playwright...`);
+    } else {
+      console.log(`[article-fetcher] Cheerio failed for ${url}: ${err.message}, trying Playwright...`);
+    }
   }
 
-  return { title, content };
+  // Fallback to Playwright (headless browser)
+  try {
+    const result = await fetchWithPlaywright(url);
+    if (!result.content || result.content.length < 200) {
+      throw new Error(`Content too short (${result.content?.length || 0} chars) for ${url}`);
+    }
+    return result;
+  } catch (err) {
+    throw new Error(`Both cheerio and Playwright failed for ${url}: ${err.message}`);
+  }
 }
