@@ -36,12 +36,13 @@ async function extractContent(tabId) {
 
         const extractMainText = () => {
           // Ищем основной контент страницы Perplexity
+          // Порядок важен: сначала точные селекторы, потом общие
           const selectors = [
             'article',
             '[class*="prose"]',
-            '[class*="content"]',
+            '.scrollbar-subtle',  // контент без сайдбара на /page/ URL-ах
+            '.markdown',
             'main',
-            '.markdown'
           ];
 
           for (const selector of selectors) {
@@ -51,10 +52,10 @@ async function extractContent(tabId) {
             }
           }
 
-          // Fallback: весь body без скриптов
+          // Fallback: весь body без скриптов и сайдбара
           const body = document.body?.cloneNode(true);
           if (!body) return '';
-          body.querySelectorAll('script, style, nav, header, footer').forEach(el => el.remove());
+          body.querySelectorAll('script, style, nav, header, footer, [class*="sideBarWidth"]').forEach(el => el.remove());
           return body.innerText.trim();
         };
 
