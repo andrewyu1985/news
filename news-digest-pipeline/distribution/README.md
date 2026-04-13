@@ -1,94 +1,45 @@
-# Distribution — Мультиплатформенная дистрибуция контента
+# Distribution Pipeline — Мультиплатформенная дистрибуция
 
-Этот раздел объединяет все пайплайны дистрибуции дайджестов в социальные сети.
+**Вход:** готовые медиа-ассеты (текст, изображение, видео, аудио)  
+**Выход:** опубликовано на платформах
 
 ## Архитектура
 
 ```mermaid
 flowchart TD
-    D[📰 Готовый дайджест<br/>текст из БД] --> P{Платформы}
+    A[📦 Готовые ассеты<br/>текст + изображение + видео + аудио] --> B{Дистрибуция}
     
-    P --> T[📱 Telegram<br/>Bot API]
-    P --> FP[📄 Facebook Page<br/>Graph API]
-    P --> FA[👤 Facebook Profile<br/>Patchright]
-    P --> IG[📸 Instagram<br/>Изображение + Caption]
-    P --> YT[🎬 YouTube<br/>Community / Shorts]
-    
-    subgraph "Текстовые каналы (API)"
-        T
-        FP
+    subgraph working["✅ Работает"]
+        B --> T[📱 Telegram<br/>Bot API<br/>авто-разбивка >4096]
+        B --> FP[📄 Facebook Page<br/>Graph API<br/>Page Access Token]
+        B --> FA[👤 Facebook Profile<br/>Patchright<br/>отдельный Chromium]
     end
     
-    subgraph "Browser Automation (Patchright)"
-        FA
-        YT
+    subgraph testing["🧪 Тестируется"]
+        B --> IG[📸 Instagram<br/>Graph API + картинка]
     end
     
-    subgraph "Медиа-пайплайны"
-        IG --> IG1[🖼️ Генерация фона<br/>fal.ai + шаблон]
-        IG1 --> IG2[✏️ Наложение текста<br/>Sharp / Canvas]
-        IG2 --> IG3[📱 Публикация]
-        
-        VP[🎥 Video Pipeline] --> VP1[🎤 TTS / Озвучка]
-        VP1 --> VP2[🎞️ ffmpeg сборка<br/>аудио + визуал]
-        VP2 --> VP3[📤 Upload]
-        
-        AP[🔊 Audio Pipeline] --> AP1[🎤 TTS генерация]
-        AP1 --> AP2[🎵 ffmpeg обработка]
-        AP2 --> AP3[📤 Подкаст / Upload]
+    subgraph planned["📋 Планируется"]
+        B --> YT[🎬 YouTube<br/>Shorts / Community]
+        B --> TT[🎵 TikTok<br/>Video upload]
     end
 
-    style D fill:#e3f2fd
-    style T fill:#a5d6a7
-    style FP fill:#a5d6a7
-    style FA fill:#fff9c4
-    style IG fill:#f8bbd0
-    style YT fill:#ffccbc
-    style VP fill:#d1c4e9
-    style AP fill:#b2dfdb
+    style A fill:#e3f2fd
+    style working fill:#e8f5e9,stroke:#4caf50
+    style testing fill:#fff8e1,stroke:#ffc107
+    style planned fill:#f3e5f5,stroke:#9c27b0
 ```
 
-## Пайплайны
+## Каналы дистрибуции
 
-### 1. Текстовые каналы (работают)
-
-| Канал | Метод | Статус |
-|-------|-------|--------|
-| Telegram (@alexkrol) | Bot API, авто-разбивка >4096 символов | ✅ Работает |
-| Facebook Page (Alex Krol) | Graph API, Page Access Token | ✅ Работает |
-| Facebook Profile | Patchright, отдельный Chromium | ✅ Тестируется |
-
-### 2. Instagram Pipeline (в разработке)
-
-Генерация уникального изображения + публикация.
-
-**Этапы:** Claude → промпт + заголовок → fal.ai (Recraft V3) → Sharp (текст) → Instagram API
-
-**Подробнее:** [instagram/README.md](../instagram/README.md)
-
-### 3. Video Pipeline (планируется)
-
-Генерация коротких видео из дайджеста для YouTube Shorts / Reels / TikTok.
-
-**Концепция:**
-- TTS озвучка текста (голос, интонация)
-- Визуальный ряд: слайды с ключевыми тезисами + фоновые изображения
-- Сборка через ffmpeg (локально)
-- Длительность: 60-90 секунд
-
-**Подробнее:** [video/README.md](video/README.md)
-
-### 4. Audio Pipeline (планируется)
-
-Аудиоверсия дайджеста для подкастов.
-
-**Концепция:**
-- TTS озвучка полного текста дайджеста
-- Музыкальная подложка (intro/outro)
-- Сборка через ffmpeg
-- Публикация: подкаст-платформы, Telegram voice
-
-**Подробнее:** [audio/README.md](audio/README.md)
+| Канал | Метод | Тип контента | Статус |
+|-------|-------|-------------|--------|
+| **Telegram** (@alexkrol) | Bot API | Текст | ✅ Работает |
+| **Facebook Page** (Alex Krol) | Graph API | Текст | ✅ Работает |
+| **Facebook Profile** | Patchright | Текст | ✅ Тестируется |
+| **Instagram** (@alexeykrol) | Graph API / Patchright | Картинка + текст | 📋 Планируется |
+| **YouTube** | Patchright | Видео / Community | 📋 Планируется |
+| **TikTok** | API / Patchright | Видео | 📋 Планируется |
 
 ## Последовательность публикации
 
@@ -102,51 +53,59 @@ sequenceDiagram
     U->>D: Нажимает "Опубликовать"
     D->>S: POST /api/digests/:id/publish
     
-    par Мгновенная публикация
-        S->>S: Telegram Bot API → канал
-        S->>S: Facebook Graph API → Page
+    par Мгновенно (API)
+        S->>S: Telegram → канал @alexkrol
+        S->>S: Facebook → Page Alex Krol
     end
     
     S-->>D: {telegram: ✅, facebook: ✅}
-    D-->>U: "Опубликовано в TG + FB Page"
     
-    Note over M: Через 2-5 минут (watcher)
-    M->>S: GET /api/digests (проверка новых)
+    Note over M: Через 2-5 мин (watcher)
     M->>M: Patchright → Facebook Profile
-    M-->>U: 🔔 "Опубликовано в FB Profile"
+    M-->>U: 🔔 Опубликовано в FB Profile
     
-    Note over M: Instagram (будет)
-    M->>M: Claude → заголовок + промпт
-    M->>M: fal.ai → изображение
-    M->>M: Sharp → текст на картинке
-    M->>M: Instagram API → публикация
-    M-->>U: 🔔 "Опубликовано в Instagram"
+    Note over M: Следом
+    M->>M: Instagram → картинка + caption
+    M-->>U: 🔔 Опубликовано в Instagram
 ```
 
-## Общие компоненты
-
-| Компонент | Где | Для чего |
-|-----------|-----|----------|
-| fal.ai | Облако | Генерация изображений |
-| Sharp | Локально (Mac/VPS) | Обработка изображений, наложение текста |
-| ffmpeg | Локально (Mac) | Сборка видео и аудио |
-| Patchright | Локально (Mac) | Browser automation для FB/Instagram/YouTube |
-| Claude API | Облако | Генерация промптов, заголовков, caption |
-
-## Структура папок
+## Структура
 
 ```
 distribution/
-├── README.md          # Этот файл
-├── video/             # Video Pipeline
+├── README.md               # Этот файл
+├── telegram/
+│   ├── telegram.js          # Publisher: Bot API + message splitting
+│   └── telegram-setup.md    # Документация настройки
+├── facebook-page/
+│   ├── facebook.js          # Publisher: Graph API
+│   └── facebook-page-setup.md
+├── facebook-profile/
+│   ├── fb-publish.js        # Patchright automation
+│   ├── fb-profile-watcher.js # Автоматический watcher (launchd)
+│   └── facebook-setup.md    # Документация (наши мытарства)
+├── instagram/               # TODO
 │   └── README.md
-└── audio/             # Audio Pipeline
+├── youtube/                 # TODO
+│   └── README.md
+└── tiktok/                  # TODO
     └── README.md
+```
 
-instagram/             # Instagram Pipeline (отдельно, т.к. уже развёрнут)
-├── README.md
-├── templates/
-├── output/
-├── src/
-└── fonts/
+## Env переменные
+
+```env
+# Telegram
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_PUBLISH_CHAT_ID=-100...  # Канал (с -100 префиксом)
+
+# Facebook Page
+FACEBOOK_PAGE_ID=883174691695126
+FACEBOOK_PAGE_ACCESS_TOKEN=...    # Page token (не User token!)
+
+# Facebook Profile
+# Сессия хранится в .fb-profile/ (Patchright persistent context)
+
+# Instagram (TODO)
+INSTAGRAM_BUSINESS_ACCOUNT_ID=...
 ```
