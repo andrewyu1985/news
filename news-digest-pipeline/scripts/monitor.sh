@@ -8,7 +8,7 @@ set -euo pipefail
 
 CONTAINER_NAME="news-digest-pipeline"
 HEALTH_URL="http://localhost:3000/health"
-NTFY_TOPIC="${NTFY_TOPIC:-news-digest-alexkrol}"
+NTFY_TOPIC="${NTFY_TOPIC:-your-ntfy-topic}"
 DISK_THRESHOLD=90
 MEM_THRESHOLD=90
 

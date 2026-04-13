@@ -24,3 +24,12 @@ coverage/
 *.db
 *.sqlite
 *.sqlite3
+.claude/
+images/
+*.key
+*.pem
+*.p12
+credentials.json
+secrets/
+.fb-profile/
+.chrome-debug-profile/

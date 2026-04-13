@@ -140,8 +140,8 @@ npm start
 
 ```bash
 # Деплой через SCP на VPS
-scp -i ~/.ssh/agent_news_001_ed25519 <files> agent@148.230.84.56:/srv/news_agent_001/news-digest-pipeline/
-ssh agent@148.230.84.56 "cd /srv/news_agent_001/news-digest-pipeline && docker compose up -d --build"
+scp -i ~/.ssh/your_ssh_key <files> deploy-user@YOUR_VPS_IP:/srv/your-project/news-digest-pipeline/
+ssh deploy-user@YOUR_VPS_IP "cd /srv/your-project/news-digest-pipeline && docker compose up -d --build"
 ```
 
 ### Мониторинг
@@ -291,7 +291,7 @@ node scripts/local-fetcher.js
 | `NTFY_TOPIC` | Топик для push-уведомлений |
 | `TELEGRAM_BOT_TOKEN` | Токен Telegram бота |
 | `TELEGRAM_CHAT_ID` | Chat ID для приёма URL |
-| `TELEGRAM_PUBLISH_CHAT_ID` | ID канала для публикации (-1001094435752) |
+| `TELEGRAM_PUBLISH_CHAT_ID` | ID канала для публикации (YOUR_TELEGRAM_CHANNEL_ID) |
 | `TELEGRAM_WEBHOOK_SECRET` | Секрет для webhook |
 | `FACEBOOK_PAGE_ID` | ID Facebook Page |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Page Access Token |

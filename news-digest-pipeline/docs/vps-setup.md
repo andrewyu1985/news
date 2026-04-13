@@ -1,8 +1,8 @@
 # VPS Setup — News Digest Pipeline
 
 ## Server Info
-- **IP:** 148.230.84.56
-- **IPv6:** 2a02:4780:2d:db43::1
+- **IP:** YOUR_VPS_IP
+- **IPv6:** YOUR_VPS_IPV6
 - **OS:** Ubuntu 24.04 (template: Ubuntu 24.04 with n8n)
 - **Docker:** installed (Docker Manager for Docker Compose)
 - **Existing services:** n8n
@@ -10,15 +10,15 @@
 ## Access Model
 
 ### Deploy user (for CI/CD agent)
-- **Username:** agent
+- **Username:** deploy-user
 - **Auth:** SSH key (no password)
 - **Home:** `/home/<deploy-user>/`
-- **Project path:** `/srv/news_agent_001/`
+- **Project path:** `/srv/your-project/`
 - **Permissions:**
-  - Read/write to `/srv/news_agent_001/` (code, .env, data/)
+  - Read/write to `/srv/your-project/` (code, .env, data/)
   - Limited sudo for Docker Compose only:
     ```
-    <user> ALL=(ALL) NOPASSWD: /usr/bin/docker compose -f /srv/news_agent_001/docker-compose.yml *
+    <user> ALL=(ALL) NOPASSWD: /usr/bin/docker compose -f /srv/your-project/docker-compose.yml *
     ```
   - NO access to apt, systemctl, other directories
   - NO root/full sudo
@@ -26,9 +26,9 @@
 ### What the agent needs access to
 | Path/Command | Access | Purpose |
 |-------------|--------|---------|
-| `/srv/news_agent_001/` | read/write | Project files, code |
-| `/srv/news_agent_001/.env` | read/write | Secrets (API keys, tokens) |
-| `/srv/news_agent_001/data/` | read/write | SQLite database |
+| `/srv/your-project/` | read/write | Project files, code |
+| `/srv/your-project/.env` | read/write | Secrets (API keys, tokens) |
+| `/srv/your-project/data/` | read/write | SQLite database |
 | `docker compose build` | execute | Build container |
 | `docker compose up -d` | execute | Start/restart service |
 | `docker compose down` | execute | Stop service |
@@ -77,7 +77,7 @@ Host (Ubuntu 24.04)
 
 ## Network / Domain
 - **Domain:** news.questtales.com
-- **DNS:** Cloudflare (A-record → 148.230.84.56, DNS only / grey cloud)
+- **DNS:** Cloudflare (A-record → YOUR_VPS_IP, DNS only / grey cloud)
 - **HTTPS:** Let's Encrypt via certbot
 - **Reverse proxy:** nginx on host
 - **Port mapping:** host:3000 → container:3000 (internal, nginx forwards)
@@ -90,7 +90,7 @@ Script: `scripts/monitor.sh` (runs as cron every 5 min)
 
 Cron setup (on VPS):
 ```
-*/5 * * * * /srv/news_agent_001/news-digest-pipeline/scripts/monitor.sh
+*/5 * * * * /srv/your-project/news-digest-pipeline/scripts/monitor.sh
 ```
 
 ## OS Updates
@@ -103,9 +103,9 @@ Cron setup (on VPS):
 - [ ] Add public key to VPS deploy user
 - [ ] Add private key to GitHub Secrets (VPS_SSH_KEY)
 - [ ] Add VPS_HOST and VPS_USER to GitHub Secrets
-- [ ] Create /srv/news_agent_001/ directory
+- [ ] Create /srv/your-project/ directory
 - [ ] Set ownership to deploy user
-- [ ] Clone repo to /srv/news_agent_001/
+- [ ] Clone repo to /srv/your-project/
 - [ ] Create .env with production secrets
 - [ ] Configure sudo for docker compose (sudoers.d)
 - [ ] Setup nginx reverse proxy

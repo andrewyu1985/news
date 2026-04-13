@@ -54,7 +54,7 @@ curl "https://graph.facebook.com/v23.0/me/accounts?access_token=USER_TOKEN"
   "data": [
     {
       "access_token": "PAGE_ACCESS_TOKEN_HERE",
-      "id": "883174691695126",
+      "id": "YOUR_FACEBOOK_PAGE_ID",
       "name": "Alex Krol"
     }
   ]
@@ -65,8 +65,8 @@ curl "https://graph.facebook.com/v23.0/me/accounts?access_token=USER_TOKEN"
 
 | Страница | Page ID |
 |----------|---------|
-| Alex Krol | `883174691695126` |
-| Квест Теории Каст и Ролей (тестовая) | `100686548606025` |
+| Alex Krol | `YOUR_FACEBOOK_PAGE_ID` |
+| Квест Теории Каст и Ролей (тестовая) | `YOUR_TEST_PAGE_ID` |
 
 ---
 
@@ -82,7 +82,7 @@ curl -X POST "https://graph.facebook.com/v19.0/{PAGE_ID}/feed" \
 
 ```json
 {
-  "id": "883174691695126_123456789"
+  "id": "YOUR_FACEBOOK_PAGE_ID_123456789"
 }
 
 ```
@@ -115,7 +115,7 @@ fb_exchange_token=SHORT_LIVED_TOKEN"
 В `.env` файле (или на VPS):
 
 ```env
-FACEBOOK_PAGE_ID=883174691695126
+FACEBOOK_PAGE_ID=YOUR_FACEBOOK_PAGE_ID
 FACEBOOK_PAGE_ACCESS_TOKEN=EAAxxxxxx...
 ```
 

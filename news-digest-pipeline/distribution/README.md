@@ -100,7 +100,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_PUBLISH_CHAT_ID=-100...  # Канал (с -100 префиксом)
 
 # Facebook Page
-FACEBOOK_PAGE_ID=883174691695126
+FACEBOOK_PAGE_ID=YOUR_FACEBOOK_PAGE_ID
 FACEBOOK_PAGE_ACCESS_TOKEN=...    # Page token (не User token!)
 
 # Facebook Profile
