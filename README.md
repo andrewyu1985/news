@@ -10,27 +10,103 @@
 
 ## Архитектура
 
-```
-iPhone (Telegram бот @aivideoproducer_bot)
-      │
-      │ Пользователь отправляет ссылки
-      ▼
-VPS (news.questtales.com)
-      │
-      ├── Telegram Webhook → сохранение URL в SQLite
-      ├── Queue Manager (каждые 60 сек)
-      │     └── 13+ статей? → Claude API
-      │           ├── Phase A: prompt.md → комментарий к каждой статье
-      │           └── Phase B: assembly_prompt.md → сборка дайджеста
-      ├── Push-уведомление (Ntfy)
-      └── Dashboard (news.questtales.com) → кнопка «Опубликовать»
-            ├── Telegram канал (@alexkrol) — Bot API
-            ├── Facebook Page (Alex Krol) — Graph API
-            └── Facebook Profile — Patchright (Mac, launchd)
+### Полный пайплайн
 
-Mac (локальные скрипты)
-      ├── local-fetcher.js — обогащение статей через Chrome + AppleScript
-      └── fb-profile-watcher.js — автопубликация в Facebook профиль
+```mermaid
+graph TB
+    subgraph "📱 Вход"
+        A[iPhone / Telegram] -->|URL ссылки| B[Telegram Bot Webhook]
+        A2[Chrome Extension] -->|JSON batch| C[API /articles/batch]
+    end
+
+    subgraph "☁️ VPS (news.questtales.com)"
+        B --> D[(SQLite)]
+        C --> D
+        E[Queue Manager<br/>каждые 60 сек] -->|13+ статей?| F[Claude API]
+        D --> E
+
+        F -->|Phase A: prompt.md| G[Комментарий к каждой статье]
+        G -->|Phase B: assembly_prompt.md| H[Сборка дайджеста]
+        H --> I[(SQLite: digests)]
+        I --> J[Dashboard<br/>news.questtales.com]
+        I --> K[Push Ntfy.sh]
+    end
+
+    subgraph "🖥️ Mac (локально)"
+        L[local-fetcher.js] -->|Chrome + AppleScript| D
+        M[fb-profile-watcher.js] -->|Patchright| N[Facebook Profile]
+    end
+
+    subgraph "📤 Публикация"
+        J -->|Кнопка Опубликовать| O[Telegram канал @alexkrol]
+        J -->|Кнопка Опубликовать| P[Facebook Page Alex Krol]
+        M -->|Через 5 мин| N
+    end
+
+    style A fill:#0088cc,color:#fff
+    style F fill:#d97706,color:#fff
+    style J fill:#059669,color:#fff
+    style N fill:#1877f2,color:#fff
+    style O fill:#0088cc,color:#fff
+    style P fill:#1877f2,color:#fff
+```
+
+### Процесс публикации
+
+```mermaid
+sequenceDiagram
+    participant U as Пользователь
+    participant D as Dashboard
+    participant API as VPS API
+    participant TG as Telegram
+    participant FBP as Facebook Page
+    participant W as Mac Watcher
+    participant FBA as Facebook Profile
+
+    U->>D: Нажимает 🚀 Опубликовать
+    D->>API: POST /digests/:id/publish
+    
+    par Одновременно
+        API->>TG: Bot API sendMessage<br/>(разбивка по 4096 символов)
+        API->>FBP: Graph API POST /feed
+    end
+    
+    API-->>D: ✅ Опубликовано (TG + Page)
+    
+    Note over W: Каждые 5 минут проверяет
+    W->>API: GET /api/digests (новые published?)
+    API-->>W: Есть неопубликованный в профиль
+    
+    W->>FBA: Patchright: открыть Facebook<br/>вставить текст, удалить сниппеты<br/>Next → Post
+    FBA-->>W: ✅ Опубликовано
+```
+
+### Генерация дайджеста (Claude API)
+
+```mermaid
+flowchart LR
+    subgraph "Phase A — Комментарии"
+        A1[Статья 1] -->|prompt.md| C1[Claude API]
+        A2[Статья 2] -->|prompt.md| C2[Claude API]
+        A3[...Статья N] -->|prompt.md| C3[Claude API]
+        C1 --> R1[Комментарий 1<br/>80-150 слов]
+        C2 --> R2[Комментарий 2]
+        C3 --> R3[Комментарий N]
+    end
+
+    subgraph "Phase B — Сборка"
+        R1 --> ASM[Claude API<br/>assembly_prompt.md]
+        R2 --> ASM
+        R3 --> ASM
+        CFG[config.md<br/>курс, граница, хэштеги] --> ASM
+        ASM --> DIGEST["#новости<br/>1. Комментарий + URL<br/>2. Комментарий + URL<br/>...<br/>Курс (в середине)<br/>Граница + хэштеги"]
+    end
+
+    style C1 fill:#d97706,color:#fff
+    style C2 fill:#d97706,color:#fff
+    style C3 fill:#d97706,color:#fff
+    style ASM fill:#d97706,color:#fff
+    style DIGEST fill:#059669,color:#fff
 ```
 
 ## Dashboard
