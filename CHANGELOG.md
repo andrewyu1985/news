@@ -6,9 +6,67 @@
 
 ---
 
-## [1.0.0] — 2026-04-13
+## [2.0.4] — 2026-04-13
 
-### Первый публичный релиз
+### Security hardening + публичный релиз
+
+#### Добавлено
+
+- Раздельные ключи для API и Dashboard
+- 256-bit рандомные ключи (crypto.randomBytes)
+- Rate limit на dashboard (10 attempts / 15 min)
+- Timing-safe сравнение (crypto.timingSafeEqual)
+- Домен заменён на плейсхолдеры для публичного репозитория
+- Версия в README и Dashboard
+
+---
+
+## [2.0.3] — 2026-04-13
+
+### Per-platform publishing + digest fixes
+
+#### Добавлено
+
+- Кнопки публикации по платформам (📨 TG / 📘 FB отдельно)
+- Уникальный seq_number для каждого дайджеста
+- Кнопка удаления дайджеста
+- Автоудаление преамбулы перед #новости
+- Защита от дубликатов статей между дайджестами
+
+---
+
+## [2.0.2] — 2026-04-13
+
+### Security audit + authentication
+
+#### Добавлено
+
+- API аутентификация (Bearer token)
+- Dashboard аутентификация (HTTP Basic Auth)
+- Rate limiting (30/5/3 req/min)
+- SSRF-защита (whitelist perplexity.ai)
+- Удаление body logging в production
+- Полный аудит безопасности (SECURITY_AUDIT_2026-04-13.md)
+
+---
+
+## [2.0.1] — 2026-04-12
+
+### Facebook Profile automation
+
+#### Добавлено
+
+- Публикация в личный Facebook Profile через Patchright (stealth Playwright)
+- Отдельный Chromium с persistent session (не мешает основному Chrome)
+- Удаление link preview сниппетов перед публикацией
+- macOS алерт перед публикацией
+- fb-profile-watcher.js (launchd cron, каждые 5 мин)
+
+---
+
+## [2.0.0] — 2026-04-11
+
+### Auto-publishing + Dashboard
 
 #### Добавлено
 
