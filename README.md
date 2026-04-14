@@ -19,11 +19,6 @@
   <img src="docs/screenshots/dash.png" width="100%" alt="Dashboard" />
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/telegram.png" width="32%" alt="Telegram канал" />
-  <img src="docs/screenshots/facebook.png" width="32%" alt="Facebook пост" />
-</p>
-
 ---
 
 ## Как это работает
