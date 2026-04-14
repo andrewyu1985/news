@@ -1,9 +1,11 @@
 import express from 'express';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import config from './config.js';
 import { initDb } from './db/index.js';
+import { apiAuth, dashboardAuth } from './middleware/auth.js';
 import healthRouter from './routes/health.js';
 import articlesRouter from './routes/articles.js';
 import digestsRouter from './routes/digests.js';
@@ -20,22 +22,57 @@ const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 
-// Debug: log all incoming requests
-app.use((req, res, next) => {
-  if (req.path !== '/health') {
-    console.log(`[debug] ${req.method} ${req.path} Content-Type: ${req.headers['content-type']} Body:`, typeof req.body === 'string' ? req.body.slice(0, 200) : JSON.stringify(req.body)?.slice(0, 200));
-  }
-  next();
+// Debug logging — only in development
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    if (req.path !== '/health') {
+      console.log(`[debug] ${req.method} ${req.path} Content-Type: ${req.headers['content-type']}`);
+    }
+    next();
+  });
+}
+
+// Rate limiters
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests' },
 });
 
-// Static files (dashboard)
-app.use(express.static(join(__dirname, 'public')));
+const publishLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: 'Too many publish requests' },
+});
 
-// Routes
+const generateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 3,
+  message: { error: 'Too many generation requests' },
+});
+
+// Health endpoint — public, no auth
 app.use('/health', healthRouter);
-app.use('/api/articles', articlesRouter);
-app.use('/api/digests', digestsRouter);
+
+// Dashboard (Basic Auth for static files only, not API)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') return next();
+  dashboardAuth(req, res, () => {
+    express.static(join(__dirname, 'public'))(req, res, next);
+  });
+});
+
+// Telegram webhook — mounted before general API auth (has its own secret-token check)
 app.use('/api/telegram', telegramRouter);
+
+// API auth + rate limiting for all other /api/* routes
+app.use('/api', apiAuth, apiLimiter);
+
+// API routes with specific rate limits
+app.use('/api/articles', articlesRouter);
+app.use('/api/digests/generate', generateLimiter);
+app.use('/api/digests/:id/publish', publishLimiter);
+app.use('/api/digests', digestsRouter);
 
 // Initialize
 try {

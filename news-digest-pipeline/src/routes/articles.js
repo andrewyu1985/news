@@ -18,10 +18,20 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'url is required' });
     }
 
+    let parsedUrl;
     try {
-      new URL(url);
+      parsedUrl = new URL(url);
     } catch {
       return res.status(400).json({ error: 'Invalid URL' });
+    }
+
+    // SSRF protection: only allow known sources over HTTPS
+    if (parsedUrl.protocol !== 'https:') {
+      return res.status(400).json({ error: 'Only HTTPS URLs are accepted' });
+    }
+    const allowedHosts = ['perplexity.ai', 'www.perplexity.ai'];
+    if (!allowedHosts.includes(parsedUrl.hostname)) {
+      return res.status(400).json({ error: 'Only perplexity.ai URLs are accepted' });
     }
 
     const { title: providedTitle, content: providedContent } = req.body;

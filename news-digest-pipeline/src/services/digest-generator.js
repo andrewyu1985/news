@@ -113,7 +113,15 @@ export async function generateDigest(db, articles, config) {
     messages: [{ role: 'user', content: assemblyUserMessage }],
   });
 
-  const digestContent = assemblyResponse.content[0]?.text || '';
+  let digestContent = assemblyResponse.content[0]?.text || '';
+
+  // Post-processing: remove any preamble before "#новости"
+  // Claude sometimes adds explanatory text before the actual digest
+  const digestStart = digestContent.indexOf('#новости');
+  if (digestStart > 0) {
+    digestContent = digestContent.substring(digestStart);
+    log.push(`Removed ${digestStart} chars of preamble before #новости`);
+  }
 
   // Create digest record
   const digestId = createDigest({

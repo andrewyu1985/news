@@ -69,9 +69,13 @@
     .btn-copied { background: #d4edda; color: #155724; }
     .btn-preview { background: #e3f2fd; color: #1565c0; margin-right: 6px; }
     .btn-preview:hover { background: #bbdefb; }
-    .btn-publish { background: #4CAF50; color: #fff; margin-right: 6px; }
+    .btn-publish { background: #4CAF50; color: #fff; margin-right: 4px; font-size: 11px; padding: 4px 8px; }
     .btn-publish:hover { background: #43a047; }
-    .btn-published { background: #c3e6cb; color: #155724; margin-right: 6px; }
+    .btn-published { background: #c3e6cb; color: #155724; margin-right: 4px; font-size: 11px; padding: 4px 8px; }
+    .platform-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+    .plat-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; background: #f8f9fa; cursor: pointer; }
+    .plat-btn:hover { background: #e8eaed; }
+    .plat-btn.sent { background: #c3e6cb; color: #155724; border-color: #28a745; cursor: default; }
     .empty { text-align: center; padding: 48px; color: #999; }
     .refresh-note { text-align: right; font-size: 11px; color: #aaa; margin-top: 12px; }
     .modal-overlay {
@@ -144,7 +148,9 @@
   <script>
     function fmtDatetime(isoStr) {
       if (!isoStr) return null;
-      const d = new Date(isoStr + 'Z'); // SQLite stores UTC
+      // Handle both SQLite format "2026-04-12 23:20:03" and ISO "2026-04-12T23:20:03.649Z"
+      const normalized = isoStr.includes('T') ? isoStr : isoStr + 'Z';
+      const d = new Date(normalized);
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const hh = String(d.getHours()).padStart(2, '0');
@@ -191,16 +197,23 @@
           ? `<span class="pub-date">${pub.date} ${pub.time}</span>`
           : '<span class="no-pub">—</span>';
 
-        // Action buttons
+        // Action buttons — per-platform
         let actionBtn = '';
         if (!hasContent) {
           actionBtn = '<span style="color:#ccc;font-size:12px">нет контента</span>';
         } else {
-          const isPublished = status === 'published';
-          const publishBtn = isPublished
-            ? `<button class="btn btn-published" disabled>&#10003; Опубликовано</button>`
-            : `<button class="btn btn-publish" onclick="publishDigest('${d.id}', this)">&#128640; Опубликовать</button>`;
-          actionBtn = `<button class="btn btn-preview" onclick="previewDigest('${d.id}')">&#128065;</button>${publishBtn}<button class="btn btn-copy" onclick="copyDigest('${d.id}', this)">&#128203;</button>`;
+          const tgSent = !!d.telegram_message_id;
+          const fbSent = !!d.facebook_post_id;
+
+          const tgBtn = tgSent
+            ? `<button class="plat-btn sent" disabled>✓ TG</button>`
+            : `<button class="plat-btn" onclick="publishPlatform('${d.id}','telegram',this)">📨 TG</button>`;
+          const fbBtn = fbSent
+            ? `<button class="plat-btn sent" disabled>✓ FB</button>`
+            : `<button class="plat-btn" onclick="publishPlatform('${d.id}','facebook',this)">📘 FB</button>`;
+
+          const delBtn = `<button class="btn" style="background:#f8d7da;color:#721c24;font-size:11px;padding:3px 6px;" onclick="deleteDigest('${d.id}')">✕</button>`;
+          actionBtn = `<div class="platform-row"><button class="btn btn-preview" onclick="previewDigest('${d.id}')">&#128065;</button>${tgBtn}${fbBtn}<button class="btn btn-copy" onclick="copyDigest('${d.id}', this)">&#128203;</button>${delBtn}</div>`;
         }
 
         // Status dropdown
@@ -210,7 +223,7 @@
         </select>`;
 
         return `<tr>
-          <td>${i + 1}</td>
+          <td>${d.seq_number || (i + 1)}</td>
           <td>${createdHtml}</td>
           <td>${pubHtml}</td>
           <td>${d.articles_count || 0}</td>
@@ -254,34 +267,47 @@
       }
     }
 
-    async function publishDigest(id, btn) {
-      if (!confirm('Опубликовать дайджест во все каналы (Telegram, Facebook)?')) return;
+    async function publishPlatform(id, platform, btn) {
+      const names = { telegram: 'Telegram', facebook: 'Facebook' };
+      if (!confirm('Опубликовать в ' + names[platform] + '?')) return;
       btn.disabled = true;
-      btn.innerHTML = '⏳ Публикация...';
+      btn.textContent = '⏳...';
       try {
-        const res = await fetch(`/api/digests/${id}/publish`, { method: 'POST' });
+        const res = await fetch(`/api/digests/${id}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforms: [platform] }),
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Server error');
 
-        const channels = [];
-        if (data.published?.telegram) channels.push('Telegram');
-        if (data.published?.facebook) channels.push('Facebook');
-
-        btn.className = 'btn btn-published';
-        btn.innerHTML = '&#10003; Опубликовано';
-        btn.onclick = null;
-        setTimeout(loadDigests, 500);
-
-        if (channels.length > 0) {
-          alert('Опубликовано: ' + channels.join(', '));
+        const result = data.published?.[platform];
+        if (result) {
+          btn.className = 'plat-btn sent';
+          btn.textContent = '✓ ' + (platform === 'telegram' ? 'TG' : 'FB');
+          btn.onclick = null;
         } else {
-          alert('Ни один канал не настроен или публикация не удалась. Проверьте настройки.');
+          alert(names[platform] + ': публикация не удалась. Проверьте токен.');
+          btn.disabled = false;
+          btn.textContent = (platform === 'telegram' ? '📨 TG' : '📘 FB');
         }
+        setTimeout(loadDigests, 500);
       } catch (err) {
         console.error('Publish failed:', err);
-        alert('Ошибка публикации: ' + err.message);
+        alert('Ошибка: ' + err.message);
         btn.disabled = false;
-        btn.innerHTML = '&#128640; Опубликовать';
+        btn.textContent = (platform === 'telegram' ? '📨 TG' : '📘 FB');
+      }
+    }
+
+    async function deleteDigest(id) {
+      if (!confirm('Удалить этот дайджест? Статьи вернутся в очередь.')) return;
+      try {
+        const res = await fetch(`/api/digests/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Server error');
+        loadDigests();
+      } catch (err) {
+        alert('Ошибка удаления: ' + err.message);
       }
     }
 

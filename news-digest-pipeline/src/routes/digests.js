@@ -109,7 +109,8 @@ router.get('/:id/text', (req, res) => {
   }
 });
 
-// POST /api/digests/:id/publish — publish to enabled platforms
+// POST /api/digests/:id/publish — publish to selected platforms
+// Body: { platforms: ["telegram", "facebook"] } — optional, defaults to all
 router.post('/:id/publish', async (req, res) => {
   try {
     const digest = getDigest(req.params.id);
@@ -121,7 +122,8 @@ router.post('/:id/publish', async (req, res) => {
       return res.status(400).json({ error: 'Digest has no content to publish' });
     }
 
-    const results = await publishDigest(digest, config);
+    const { platforms } = req.body || {};
+    const results = await publishDigest(digest, config, platforms);
     res.json({ digestId: digest.id, published: results });
   } catch (err) {
     console.error('[digests] POST /:id/publish error:', err);
@@ -177,6 +179,27 @@ router.patch('/:id/status', (req, res) => {
     res.json({ ok: true, id: req.params.id, status: updated.status, published_at: updated.published_at });
   } catch (err) {
     console.error('[digests] PATCH /:id/status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/digests/:id — delete a digest
+router.delete('/:id', (req, res) => {
+  try {
+    const digest = getDigest(req.params.id);
+    if (!digest) {
+      return res.status(404).json({ error: 'Digest not found' });
+    }
+
+    const db = getDb();
+    // Unlink articles from this digest (set them back to 'new')
+    db.prepare(`UPDATE articles SET digest_id = NULL, status = 'new', commentary = NULL WHERE digest_id = ?`).run(req.params.id);
+    // Delete digest
+    db.prepare('DELETE FROM digests WHERE id = ?').run(req.params.id);
+
+    res.json({ ok: true, deleted: req.params.id });
+  } catch (err) {
+    console.error('[digests] DELETE /:id error:', err);
     res.status(500).json({ error: err.message });
   }
 });

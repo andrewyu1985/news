@@ -40,7 +40,7 @@ export function insertArticle({ url, title, content, source = 'extension' }) {
 
 export function getNewArticles(limit = 50) {
   return db.prepare(
-    'SELECT * FROM articles WHERE status = ? ORDER BY created_at ASC LIMIT ?'
+    'SELECT * FROM articles WHERE status = ? AND digest_id IS NULL ORDER BY created_at ASC LIMIT ?'
   ).all('new', limit);
 }
 
@@ -77,9 +77,11 @@ export function assignArticlesToDigest(articleIds, digestId) {
 
 export function createDigest({ date, part = 1, articlesCount = 0 }) {
   const id = uuidv4();
+  // Auto-increment seq_number
+  const maxSeq = db.prepare('SELECT COALESCE(MAX(seq_number), 0) as max FROM digests').get().max;
   db.prepare(
-    `INSERT INTO digests (id, date, part, articles_count) VALUES (?, ?, ?, ?)`
-  ).run(id, date, part, articlesCount);
+    `INSERT INTO digests (id, date, part, articles_count, seq_number) VALUES (?, ?, ?, ?, ?)`
+  ).run(id, date, part, articlesCount, maxSeq + 1);
   return id;
 }
 

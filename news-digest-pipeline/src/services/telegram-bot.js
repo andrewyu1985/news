@@ -112,10 +112,29 @@ async function handleUrls(botToken, chatId, text, config) {
   // Deduplicate URLs within the same message
   const uniqueUrls = [...new Set(urls)];
 
+  // Filter: only allow perplexity.ai HTTPS URLs (SSRF protection)
+  const ALLOWED_HOSTS = ['perplexity.ai', 'www.perplexity.ai'];
+  const validUrls = uniqueUrls.filter((u) => {
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'https:' && ALLOWED_HOSTS.includes(parsed.hostname);
+    } catch {
+      return false;
+    }
+  });
+
+  const rejected = uniqueUrls.length - validUrls.length;
+  if (validUrls.length === 0) {
+    let reply = '⚠️ Не нашел допустимых ссылок (принимаются только perplexity.ai).';
+    if (rejected > 0) reply += `\nОтклонено: ${rejected}`;
+    await sendMessage(botToken, chatId, reply);
+    return;
+  }
+
   let saved = 0;
   let duplicates = 0;
 
-  for (const url of uniqueUrls) {
+  for (const url of validUrls) {
     const result = insertArticle({
       url,
       title: '',
@@ -135,6 +154,9 @@ async function handleUrls(botToken, chatId, text, config) {
   let reply = `✓ Сохранено: ${saved}`;
   if (duplicates > 0) {
     reply += ` (дубликатов: ${duplicates})`;
+  }
+  if (rejected > 0) {
+    reply += ` (отклонено: ${rejected})`;
   }
   reply += `\nВсего новых: ${newCount}`;
 

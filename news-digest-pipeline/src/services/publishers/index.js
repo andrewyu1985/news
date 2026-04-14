@@ -4,14 +4,17 @@ import { publishToYouTube } from './youtube.js';
 import { updateDigest } from '../../db/index.js';
 
 /**
- * Publish a digest to all enabled platforms.
- * A platform is "enabled" when its required tokens/IDs are present in config.
+ * Publish a digest to selected platforms.
  *
- * @param {Object} digest  - Digest record from DB (must have id and content)
- * @param {Object} config  - App config object
- * @returns {{ facebook, telegram, youtube }} results per platform (or null)
+ * @param {Object} digest     - Digest record from DB (must have id and content)
+ * @param {Object} config     - App config object
+ * @param {string[]} platforms - Optional: ["telegram", "facebook", "youtube"]. If omitted, publishes to all enabled.
+ * @returns {{ facebook, telegram, youtube }} results per platform (or null if skipped)
  */
-export async function publishDigest(digest, config) {
+export async function publishDigest(digest, config, platforms) {
+  const all = !platforms || !Array.isArray(platforms) || platforms.length === 0;
+  const shouldPublish = (name) => all || platforms.includes(name);
+
   const results = {
     facebook: null,
     telegram: null,
@@ -21,7 +24,7 @@ export async function publishDigest(digest, config) {
   const updateFields = {};
 
   // Facebook
-  if (config.facebookPageAccessToken && config.facebookPageId) {
+  if (shouldPublish('facebook') && config.facebookPageAccessToken && config.facebookPageId) {
     results.facebook = await publishToFacebook(
       config.facebookPageAccessToken,
       config.facebookPageId,
@@ -33,20 +36,22 @@ export async function publishDigest(digest, config) {
   }
 
   // Telegram (publish to channel, not personal chat)
-  const tgPublishChat = config.telegramPublishChatId || config.telegramChatId;
-  if (config.telegramBotToken && tgPublishChat) {
-    results.telegram = await publishToTelegram(
-      config.telegramBotToken,
-      tgPublishChat,
-      digest.content,
-    );
-    if (results.telegram?.messageId) {
-      updateFields.telegram_message_id = String(results.telegram.messageId);
+  if (shouldPublish('telegram')) {
+    const tgPublishChat = config.telegramPublishChatId || config.telegramChatId;
+    if (config.telegramBotToken && tgPublishChat) {
+      results.telegram = await publishToTelegram(
+        config.telegramBotToken,
+        tgPublishChat,
+        digest.content,
+      );
+      if (results.telegram?.messageId) {
+        updateFields.telegram_message_id = String(results.telegram.messageId);
+      }
     }
   }
 
   // YouTube (placeholder)
-  if (config.youtubeAccessToken && config.youtubeChannelId) {
+  if (shouldPublish('youtube') && config.youtubeAccessToken && config.youtubeChannelId) {
     results.youtube = await publishToYouTube(
       config.youtubeAccessToken,
       config.youtubeChannelId,
