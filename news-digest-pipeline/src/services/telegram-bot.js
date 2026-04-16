@@ -128,12 +128,12 @@ async function handleUrls(botToken, chatId, messageId, text, config) {
   // Deduplicate URLs within the same message
   const uniqueUrls = [...new Set(urls)];
 
-  // Filter: only allow perplexity.ai HTTPS URLs (SSRF protection)
-  const ALLOWED_HOSTS = ['perplexity.ai', 'www.perplexity.ai'];
+  // Filter: only allow HTTPS, block private/internal addresses (SSRF protection)
+  const PRIVATE_IP_RE = /^(localhost|127.d+.d+.d+|10.d+.d+.d+|192.168.d+.d+|172.(1[6-9]|2d|3[01]).d+.d+)$/;
   const validUrls = uniqueUrls.filter((u) => {
     try {
       const parsed = new URL(u);
-      return parsed.protocol === 'https:' && ALLOWED_HOSTS.includes(parsed.hostname);
+      return parsed.protocol === 'https:' && !PRIVATE_IP_RE.test(parsed.hostname);
     } catch {
       return false;
     }
@@ -141,7 +141,7 @@ async function handleUrls(botToken, chatId, messageId, text, config) {
 
   const rejected = uniqueUrls.length - validUrls.length;
   if (validUrls.length === 0) {
-    let reply = '⚠️ Не нашел допустимых ссылок (принимаются только perplexity.ai).';
+    let reply = '⚠️ Не нашел допустимых HTTPS-ссылок.';
     if (rejected > 0) reply += `\nОтклонено: ${rejected}`;
     await sendMessage(botToken, chatId, reply);
     return;
@@ -180,6 +180,46 @@ async function handleUrls(botToken, chatId, messageId, text, config) {
 
   if (newCount >= config.articleThreshold) {
     reply += `\n\n📰 Накопилось ${newCount} статей. Дайджест будет сгенерирован.`;
+  }
+
+  await sendMessage(botToken, chatId, reply);
+}
+
+/**
+ * Handle forwarded messages with text content but no URLs.
+ * Saves the text directly as article content.
+ */
+async function handleForwardedText(botToken, chatId, messageId, message, config) {
+  const text = message.text || message.caption || '';
+  if (!text || text.length < 50) {
+    await sendMessage(botToken, chatId, '⚠️ Текст слишком короткий для сохранения.');
+    return;
+  }
+
+  const forwardChat = message.forward_from_chat;
+  const sourceTitle = forwardChat?.title || forwardChat?.username || 'telegram-forward';
+  const fakeUrl = `https://t.me/forwarded/${chatId}/${messageId}`;
+
+  const result = insertArticle({
+    url: fakeUrl,
+    title: sourceTitle,
+    content: text,
+    source: 'telegram-forward',
+    sourceChatId: String(chatId),
+    sourceMessageId: messageId != null ? String(messageId) : null,
+  });
+
+  const newCount = getArticleCount('new');
+
+  let reply = result.duplicate
+    ? '⚠️ Такое сообщение уже сохранено.'
+    : `✓ Пересланный текст сохранён (${text.length} символов).
+Всего новых: ${newCount}`;
+
+  if (!result.duplicate && newCount >= config.articleThreshold) {
+    reply += `
+
+📰 Накопилось ${newCount} статей. Дайджест будет сгенерирован.`;
   }
 
   await sendMessage(botToken, chatId, reply);
@@ -228,8 +268,17 @@ export async function handleTelegramUpdate(update, config) {
     return;
   }
 
+  // Handle forwarded messages: if it's a forward with text but no URL → save text directly
+  const isForward = !!(message.forward_from_chat || message.forward_from || message.forward_sender_name);
+  const hasUrl = URL_REGEX.test(message.text || message.caption || '');
+
+  if (isForward && !hasUrl) {
+    await handleForwardedText(botToken, chatId, message.message_id, message, config);
+    return;
+  }
+
   // Otherwise try to extract URLs
-  await handleUrls(botToken, chatId, message.message_id, text, config);
+  await handleUrls(botToken, chatId, message.message_id, message.text || message.caption || '', config);
 }
 
 /**

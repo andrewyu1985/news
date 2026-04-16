@@ -25,13 +25,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid URL' });
     }
 
-    // SSRF protection: only allow known sources over HTTPS
+    // SSRF protection: only HTTPS, block private/internal addresses
     if (parsedUrl.protocol !== 'https:') {
       return res.status(400).json({ error: 'Only HTTPS URLs are accepted' });
     }
-    const allowedHosts = ['perplexity.ai', 'www.perplexity.ai'];
-    if (!allowedHosts.includes(parsedUrl.hostname)) {
-      return res.status(400).json({ error: 'Only perplexity.ai URLs are accepted' });
+    const PRIVATE_IP_RE = /^(localhost|127.d+.d+.d+|10.d+.d+.d+|192.168.d+.d+|172.(1[6-9]|2d|3[01]).d+.d+)$/;
+    if (PRIVATE_IP_RE.test(parsedUrl.hostname)) {
+      return res.status(400).json({ error: 'Private/internal addresses are not allowed' });
     }
 
     const { title: providedTitle, content: providedContent } = req.body;
