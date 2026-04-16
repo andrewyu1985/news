@@ -1,7 +1,58 @@
-import { getArticleCount, getNewArticles } from '../db/index.js';
+import { getArticleCount, getNewArticles, getDigest } from '../db/index.js';
 import { generateDigest } from './digest-generator.js';
 import { notifyDigestReady } from './notifier.js';
 import { getDb } from '../db/index.js';
+
+/**
+ * Send generated digest to preview chat for review before publishing.
+ */
+async function sendPreviewToTelegram(config, digestId) {
+  const previewChatId = config.telegramPreviewChatId;
+  if (!previewChatId || !config.telegramBotToken) return;
+
+  const digest = getDigest(digestId);
+  if (!digest || !digest.content) return;
+
+  const MAX_LEN = 4000;
+  const text = digest.content;
+  const chunks = [];
+  for (let i = 0; i < text.length; i += MAX_LEN) {
+    chunks.push(text.slice(i, i + MAX_LEN));
+  }
+
+  const artCount = digest.articles_count || '?';
+  const header = '<b>Дайджест готов к проверке (' + artCount + ' статей)</b>
+' +
+    'ID: <code>' + digestId + '</code>
+' +
+    'Проверьте и опубликуйте через дашборд.';
+
+  const apiUrl = 'https://api.telegram.org/bot' + config.telegramBotToken + '/sendMessage';
+
+  const send = async (msg) => {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: previewChatId,
+        text: msg,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error('[queue-manager] Preview send failed: ' + resp.status + ' ' + body);
+    }
+  };
+
+  await send(header);
+  for (const chunk of chunks) {
+    await send(chunk);
+  }
+
+  console.log('[queue-manager] Preview sent to chat ' + previewChatId);
+}
 
 let running = false;
 
@@ -29,8 +80,10 @@ async function processQueue(config) {
 
     console.log(`[queue-manager] Digest generated: ${digestId}`);
 
+    // Send preview to Telegram for review before publishing
+    await sendPreviewToTelegram(config, digestId);
+
     if (config.ntfyTopic) {
-      const { getDigest } = await import('../db/index.js');
       const digest = getDigest(digestId);
       await notifyDigestReady(config.ntfyTopic, digest);
     }

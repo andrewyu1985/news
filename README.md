@@ -115,6 +115,7 @@ TELEGRAM_CHAT_ID=123456789         # Ваш Telegram user ID
 
 # Опционально (для публикации)
 TELEGRAM_PUBLISH_CHAT_ID=-100...   # ID канала для публикации
+TELEGRAM_PREVIEW_CHAT_ID=...       # ID чата/канала для превью перед публикацией (личка с ботом или приватный канал)
 FACEBOOK_PAGE_ID=...               # ID Facebook Page
 FACEBOOK_PAGE_ACCESS_TOKEN=...     # Page Access Token
 
