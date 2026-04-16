@@ -76,7 +76,7 @@ async function main() {
     try {
       // Run fb-publish.js
       const result = execSync(
-        `node ${join(__dirname, 'fb-publish.js')} ${digest.id}`,
+        `${process.execPath} ${join(__dirname, 'fb-publish.js')} ${digest.id}`,
         { encoding: 'utf-8', timeout: 180000, cwd: join(__dirname, '..') }
       );
       console.log(result);
