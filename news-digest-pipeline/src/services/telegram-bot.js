@@ -1,4 +1,5 @@
 import { insertArticle, getArticleCount } from '../db/index.js';
+import { isHostnameSafe } from '../utils/ssrf.js';
 
 const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/g;
 
@@ -129,11 +130,10 @@ async function handleUrls(botToken, chatId, messageId, text, config) {
   const uniqueUrls = [...new Set(urls)];
 
   // Filter: only allow HTTPS, block private/internal addresses (SSRF protection)
-  const PRIVATE_IP_RE = /^(localhost|127.d+.d+.d+|10.d+.d+.d+|192.168.d+.d+|172.(1[6-9]|2d|3[01]).d+.d+)$/;
   const validUrls = uniqueUrls.filter((u) => {
     try {
       const parsed = new URL(u);
-      return parsed.protocol === 'https:' && !PRIVATE_IP_RE.test(parsed.hostname);
+      return parsed.protocol === 'https:' && isHostnameSafe(parsed.hostname);
     } catch {
       return false;
     }
@@ -198,7 +198,10 @@ async function handleForwardedText(botToken, chatId, messageId, message, config)
 
   const forwardChat = message.forward_from_chat;
   const sourceTitle = forwardChat?.title || forwardChat?.username || 'telegram-forward';
-  const fakeUrl = `https://t.me/forwarded/${chatId}/${messageId}`;
+  // Include content hash to avoid collision when chatId/messageId is reused
+  const { createHash } = await import('crypto');
+  const contentHash = createHash('sha1').update(text).digest('hex').slice(0, 8);
+  const fakeUrl = `https://t.me/forwarded/${chatId}/${messageId}/${contentHash}`;
 
   const result = insertArticle({
     url: fakeUrl,
@@ -270,7 +273,7 @@ export async function handleTelegramUpdate(update, config) {
 
   // Handle forwarded messages: if it's a forward with text but no URL → save text directly
   const isForward = !!(message.forward_from_chat || message.forward_from || message.forward_sender_name);
-  const hasUrl = URL_REGEX.test(message.text || message.caption || '');
+  const hasUrl = URL_REGEX_TEST.test(message.text || message.caption || '');
 
   if (isForward && !hasUrl) {
     await handleForwardedText(botToken, chatId, message.message_id, message, config);

@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { chromium } from 'playwright-core';
+import { validateUrlSafe } from '../utils/ssrf.js';
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
@@ -206,6 +207,12 @@ async function fetchWithPlaywright(url) {
 }
 
 export async function fetchArticleContent(url) {
+  // SSRF guard: validate URL and DNS before any network request
+  const ssrfCheck = await validateUrlSafe(url);
+  if (!ssrfCheck.ok) {
+    throw new Error("SSRF check failed: " + ssrfCheck.reason);
+  }
+
   // Try cheerio first (fast, lightweight)
   try {
     const result = await fetchWithCheerio(url);

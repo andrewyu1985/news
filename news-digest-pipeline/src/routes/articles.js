@@ -6,6 +6,7 @@ import {
   getDb,
 } from '../db/index.js';
 import { fetchArticleContent } from '../services/article-fetcher.js';
+import { isHostnameSafe } from '../utils/ssrf.js';
 
 const router = Router();
 
@@ -29,8 +30,7 @@ router.post('/', async (req, res) => {
     if (parsedUrl.protocol !== 'https:') {
       return res.status(400).json({ error: 'Only HTTPS URLs are accepted' });
     }
-    const PRIVATE_IP_RE = /^(localhost|127.d+.d+.d+|10.d+.d+.d+|192.168.d+.d+|172.(1[6-9]|2d|3[01]).d+.d+)$/;
-    if (PRIVATE_IP_RE.test(parsedUrl.hostname)) {
+    if (!isHostnameSafe(parsedUrl.hostname)) {
       return res.status(400).json({ error: 'Private/internal addresses are not allowed' });
     }
 
@@ -89,6 +89,18 @@ router.post('/batch', (req, res) => {
 
     for (const item of items) {
       if (!item.url) {
+        skipped++;
+        continue;
+      }
+
+      // SSRF protection for batch items
+      try {
+        const parsed = new URL(item.url);
+        if (parsed.protocol !== 'https:' || !isHostnameSafe(parsed.hostname)) {
+          skipped++;
+          continue;
+        }
+      } catch {
         skipped++;
         continue;
       }
